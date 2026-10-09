@@ -1,0 +1,1608 @@
+Parameters: 
+  Region: 
+    Type: String
+    Default: ap-southeast-2
+    AllowedValues: 
+      - eu-west-1
+      - eu-west-2
+      - eu-west-3
+      - eu-central-1
+      - us-west-2
+      - us-west-1
+      - us-east-2
+      - us-east-1
+      - ap-south-1
+      - ap-northeast-2
+      - ap-northeast-1
+      - ap-southeast-2
+      - ap-southeast-1
+      - ca-central-1
+      - sa-east-1
+    Description: Enter the AWS region to deploy stack. Default is ap-southeast-2
+
+  # Network Parameters with 1 VPC, 2 public subnet, 2 private subnet
+  VPCCidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.0.0/16
+    Description: Enter the CIDR for your VPC
+
+  PublicSubnet1Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.1.0/24
+    Description: Enter the CIDR for your Public Subnet 1
+
+  PublicSubnet2Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.2.0/24
+    Description: Enter the CIDR for your Public Subnet 2
+
+  PrivateSubnet1Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.3.0/24
+    Description: Enter the CIDR for your Private Subnet 1
+
+  PrivateSubnet2Cidr:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Type: String
+    Default: 10.0.4.0/24
+    Description: Enter the CIDR for your Private Subnet 2
+
+  # Auto Scaling Group Parameters.
+  Ec2AutoscaleMinSize:
+    Description: AutoScalingGroup MinSize
+    Type: String
+    Default: '0'
+
+  Ec2AutoscaleMaxSize:
+    Description: AutoScalingGroup MaxSize
+    Type: String
+    Default: '0'
+
+  Ec2AutoscaleDesiredCapacity:
+    Description: AutoScalingGroup DesiredCapacity
+    Type: String
+    Default: '0'
+
+  # Infra Parameters - ProjectName this will indicate most of the name in our environment
+  environment:
+    Description: Environment type of the project
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+  ProjectName:
+    Description: String must be unique lowercase and no special characters. max 32 characters
+    Type: String
+    Default: "projectName"
+
+  PHPVersion:
+    Type: String
+    Default: "8.2"
+
+  UploadMaxFilesize:
+    Type: String
+    Default: "10M"
+
+  PostMaxSize:
+    Type: String
+    Default: "10M"
+
+  ImageVersion:
+    Type: String
+    Default: "1.0.0"
+
+  InstanceType:
+    Type: String
+    Default: "t4g.small"
+
+  ImageId:
+    Description: ami-097e2dc60290db13c = lts-arm64(Ubuntu20.04) | ami-0370d04afa44db778 = lts-arm64(Ubuntu22.04)| ami-012bf399e76fe4368 = US-West-2
+    Type: String
+    Default: ami-097e2dc60290db13c
+    AllowedValues:
+      - ami-097e2dc60290db13c
+      - ami-0370d04afa44db778
+      - ami-0eb260c4d5475b901
+      - ami-03e26d11b665ac7be
+      - ami-012bf399e76fe4368
+
+  # RDS Parameters
+  MasterUsername:
+    Type: String
+    Description: The username for our database.
+    Default: admin
+
+  RDSInstance:
+    Description: RDS Instance type - dev=db.t3.micro | prod=db.t3.small
+    Type: String
+    Default: db.t3.micro
+
+  ParameterGroup:
+    Type: String
+    Description: The name of the database parameter group created.
+    Default: Default
+
+  # CICD Parameters
+  S3ObjectKeyZip:
+    Type: String
+    Default: "start-pipeline.zip"
+
+  SourceBranch:
+    Description: SCM branch
+    Type: String
+    Default: develop
+
+  ApiRepositoryUrl:
+    Type: String
+    Default: https://codebuild:mzfMPys6Wpg5VeeabDm2@path-to-repo.git
+    Description: Enter the TOKEN API REPOSITORY_URL
+
+  CmsRepositoryUrl:
+    Type: String
+    Default: https://codebuild:mzfMPys6Wpg5VeeabDm2@path-to-repo.git
+    Description: Enter the TOKEN CMS REPOSITORY_URL
+
+  WebRepositoryUrl:
+    Type: String
+    Default: https://codebuild:mzfMPys6Wpg5VeeabDm2@path-to-repo.git
+    Description: Enter the TOKEN WEB REPOSITORY_URL
+
+  BaseUrl:
+    Type: String
+    Default: https://codebuild:mzfMPys6Wpg5VeeabDm2@path-to-repo.git
+    Description: Enter the BASE_URL
+
+  VueAppApiUrl:
+    Type: String
+    Default: https://codebuild:mzfMPys6Wpg5VeeabDm2@path-to-repo.git
+    Description: Enter the VUE_APP_API_URL
+
+Resources:
+  # Network Resources
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: !Ref VPCCidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-vpc-${environment}" 
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${Region}a
+      MapPublicIpOnLaunch: true
+      CidrBlock: !Ref PublicSubnet1Cidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name 
+          Value: PublicSubnet-1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${Region}b
+      MapPublicIpOnLaunch: true
+      CidrBlock: !Ref PublicSubnet2Cidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name 
+          Value: PublicSubnet-2
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${Region}a
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name 
+          Value: PrivateSubnet-1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Sub ${Region}b
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name 
+          Value: PrivateSubnet-2
+
+  IG:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags:
+        -  Key: Name 
+           Value: !Sub "${ProjectName}-IG-${environment}"
+
+  AttachIGtoVPC:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref IG
+      VpcId: !Ref VPC
+
+  PublicRT:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Public-RT
+
+  PrivateRT:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name 
+          Value: Private-RT
+
+  AssociatePublicSubnet1ToPublicRT:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRT
+      SubnetId: !Ref PublicSubnet1
+
+  AssociatePublicSubnet2ToPublicRT:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PublicRT
+      SubnetId: !Ref PublicSubnet2
+
+  AssociatePrivateSubnet1ToPrivateRT:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRT
+      SubnetId: !Ref PrivateSubnet1
+
+  AssociatePrivateSubnet2ToPrivateRT:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: 
+      RouteTableId: !Ref PrivateRT
+      SubnetId: !Ref PrivateSubnet2
+
+  PublicRouteToInternet:
+    Type: AWS::EC2::Route
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IG
+      RouteTableId: !Ref PublicRT
+
+  # ec2 image builder resources
+  ImagePipeline:
+    Type: AWS::ImageBuilder::ImagePipeline
+    Properties:
+      Description: !Sub "${ProjectName} ${environment} Image Pipeline"
+      DistributionConfigurationArn: !Ref DistributionConfiguration
+      ImageRecipeArn: !Ref ImageRecipe
+      InfrastructureConfigurationArn: !Ref InfrastructureConfiguration
+      Name: !Sub "${ProjectName} ${environment} Image Pipeline"
+      Status: ENABLED
+      Tags:
+          env : !Sub "${environment}"
+    DependsOn:
+      - DistributionConfiguration
+      - ImageRecipe
+      - InfrastructureConfiguration
+
+  ImageBuilderRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub "${ProjectName}-${environment}-image-builder-role"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: CanLogToS3ImageBuilderLogs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: "*"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/EC2InstanceProfileForImageBuilder
+      Path: /
+    DependsOn:
+      - ImageBuilderBucket
+
+  ImageBuilderInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      InstanceProfileName: !Sub "${ProjectName}-${environment}-ImageBuilderInstanceProfile"
+      Path: "/"
+      Roles:
+        - !Ref ImageBuilderRole
+
+  InfrastructureConfiguration:
+    Type: AWS::ImageBuilder::InfrastructureConfiguration
+    Properties:
+      InstanceProfileName: !Sub "${ProjectName}-${environment}-ImageBuilderInstanceProfile"
+      InstanceTypes:
+        - !Ref InstanceType
+      Name: !Sub "${ProjectName}-instance-${environment}-image-builder-infrastructure-configuration"
+      Description: !Sub "${ProjectName} ${environment} Configuration Settings"
+      Logging:
+        S3Logs:
+          S3BucketName: !Sub "${ProjectName}-${environment}-image-builder"
+          S3KeyPrefix: logs
+      ResourceTags:
+          env : build
+      Tags:
+          env : !Sub "${environment}"
+    DependsOn:
+      - ImageBuilderInstanceProfile
+
+  DistributionConfiguration:
+    Type: AWS::ImageBuilder::DistributionConfiguration
+    Properties:
+      Name: !Sub "${ProjectName}-instance-${environment}-image-builder-distribution-configuration"
+      Description: !Sub "${ProjectName} ${environment} Distribution Settings"
+      Distributions:
+        - AmiDistributionConfiguration:
+            Name: !Sub "${ProjectName}-${environment}-instance-ami - {{ imagebuilder:buildDate }}"
+            AmiTags:
+              env: !Sub "${environment}"
+            LaunchPermissionConfiguration:
+              UserIds:
+                - !Ref AWS::AccountId
+          Region: !Ref AWS::Region
+      Tags:
+          env : !Sub "${environment}"
+
+  ImageRecipe:
+    Type: AWS::ImageBuilder::ImageRecipe
+    Properties:
+      Components:
+        - ComponentArn: !Join [ "", [!Sub "arn:aws:imagebuilder:${AWS::Region}:aws:component/amazon-cloudwatch-agent-linux/x.x.x"]]
+        - ComponentArn: !Join [ "", [!Sub "arn:aws:imagebuilder:${AWS::Region}:aws:component/aws-codedeploy-agent-linux/x.x.x"]]
+        - ComponentArn: !Join [ "", [!Sub "arn:aws:imagebuilder:${AWS::Region}:aws:component/aws-cli-version-2-linux/x.x.x"]]
+        - ComponentArn: !GetAtt CloudWatchComponent.Arn
+        - ComponentArn: !GetAtt DependenciesComponent.Arn
+        - ComponentArn: !Join [ "", [!Sub "arn:aws:imagebuilder:${AWS::Region}:aws:component/reboot-test-linux/x.x.x"]]
+      Name: !Sub "${ProjectName}-${environment}-webserver-ami-recipe"
+      ParentImage: !Join [ "", [!Sub "arn:aws:imagebuilder:${AWS::Region}:aws:image/ubuntu-server-20-lts-arm64/x.x.x"]]
+      #arn:aws:imagebuilder:ap-southeast-2:aws:image/ubuntu-server-20-lts-x86/x.x.x
+      Version: !Ref ImageVersion
+      WorkingDirectory: /tmp
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: false
+            VolumeType: "gp2"
+            VolumeSize: 20
+      Tags:
+          env : build
+    DependsOn:
+      - DependenciesComponent
+      - CloudWatchComponent
+
+  DependenciesComponent:
+    Type: AWS::ImageBuilder::Component
+    Properties:
+      Name: !Sub "${ProjectName} ${environment} Dependencies"
+      Description: !Sub "${ProjectName} ${environment} Dependencies"
+      Platform: Linux
+      SupportedOsVersions: 
+        - Ubuntu 16
+        - Ubuntu 18
+        - Ubuntu 20
+      Version: !Ref ImageVersion
+      Data: !Sub |
+        name: PHP Build Component
+        description: Installs PHP
+        schemaVersion: 1.0
+
+        phases:
+          - name: build
+            steps:
+            - name: AptUpdate
+              action: ExecuteBash
+              inputs:
+                commands:
+                  - apt update
+            - name: InstallApts
+              action: ExecuteBash
+              inputs:
+                commands:
+                  - apt install -y freetype-dev libc-dev libjpeg-turbo-dev libpng-dev libzip-dev oniguruma-dev zlib-dev 
+                  - apt install -y libmagickwand-dev libmagickcore-dev
+                  - apt install -y supervisor
+                  - apt install mysql-client-core-8.0
+
+            - name: InstallNginx
+              action: ExecuteBash
+              inputs:
+                commands:
+                  - systemctl disable --now apache2
+                  - apt install -y nginx
+                  - systemctl start nginx.service
+
+            - name: InstallPHP
+              action: ExecuteBash
+              inputs:
+                commands:
+                  - apt install -y software-properties-common
+                  - add-apt-repository ppa:ondrej/php -y
+                  - echo -ne '\n' | enter
+                  - apt-get install php${PHPVersion}-cli php${PHPVersion}-dev php${PHPVersion}-fpm php${PHPVersion}-xml php${PHPVersion}-mysqli php${PHPVersion}-curl php${PHPVersion}-mbstring php${PHPVersion}-gd php${PHPVersion}-zip php${PHPVersion}-redis php${PHPVersion}-bcmath -y --allow-unauthenticated
+                  - update-alternatives --set php /usr/bin/php${PHPVersion} # force php and pear to current version
+                  - pecl install imagick
+
+            - name: ModifyPHP
+              action: ExecuteBash
+              inputs:
+                commands:
+                  - sed -i 's/upload_max_filesize = .*/upload_max_filesize = '${UploadMaxFilesize}'/' /etc/php/${PHPVersion}/fpm/php.ini
+                  - sed -i 's/post_max_size = .*/post_max_size = '${PostMaxSize}'/' /etc/php/${PHPVersion}/fpm/php.ini
+                  - sed -i 's/pm = .*/pm = 'ondemand'/' /etc/php/${PHPVersion}/fpm/pool.d/www.conf
+                  - sed -i 's/pm.max_children = .*/pm.max_children = '12'/' /etc/php/${PHPVersion}/fpm/pool.d/www.conf
+                  - sed -i 's/pm.start_servers = .*/pm.start_servers = '8'/' /etc/php/${PHPVersion}/fpm/pool.d/www.conf
+                  - sed -i 's/pm.min_spare_servers = .*/pm.min_spare_servers = '1'/' /etc/php/${PHPVersion}/fpm/pool.d/www.conf
+                  - sed -i 's/pm.max_spare_servers = .*/pm.max_spare_servers = '8'/' /etc/php/${PHPVersion}/fpm/pool.d/www.conf
+                  - sed -i 's/pm.process_idle_timeout = .*/pm.process_idle_timeout = '10s'/' /etc/php/${PHPVersion}/fpm/pool.d/www.conf
+                  - systemctl restart nginx
+                  - systemctl restart php${PHPVersion}-fpm
+
+            - name: InstallNode
+              action: ExecuteBash
+              inputs:
+                commands:
+                  - curl -s https://deb.nodesource.com/setup_16.x | sudo bash
+                  - apt install -y nodejs
+                  - npm install -g pm2
+          - name: validate
+            steps:
+              - name: CheckPHPVersion
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - php -version
+                    - pecl version
+              - name: CheckNginx
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - service nginx status
+          - name: test
+            steps:
+              - name: TestUpAndRunning
+                action: ExecuteBash
+                inputs:
+                  commands:
+                    - curl http://localhost/
+
+  CloudWatchComponent:
+    Type: AWS::ImageBuilder::Component
+    Properties:
+      Name: !Sub "${ProjectName} ${environment} Install Cloudwatch Agent Configuration on start"
+      Description: !Sub "${ProjectName} Downloads the Cloudwatch SSM from Parameter Store"
+      Platform: Linux
+      SupportedOsVersions: 
+        - Ubuntu 16
+        - Ubuntu 18
+        - Ubuntu 20
+      Version: !Ref ImageVersion
+      Data: !Sub |
+        name: InstallCloudwatchConfiguration
+        description: This installs a startup script that pulls cloudwatch configuration from SSM on reboot
+        schemaVersion: 1.0
+
+        parameters:
+          - ParameterName:
+              type: string
+              default: 'AmazonCloudWatch-asginstance-configuration-ssm-${environment}'
+              description: Cloudwatch Configuration SSM Parameter Name
+
+        phases:
+          - name: build
+            steps:
+              - name: CreateServiceFile
+                action: ExecuteBash
+                inputs:
+                  commands:
+                  - "echo \"[Unit]
+          
+        Description=Configures Cloudwatch Agent
+
+        After=network.target
+
+        [Service]
+
+        ExecStart=/bin/bash -c '/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:{{ ParameterName }} && /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a start'
+
+        [Install]
+
+        WantedBy=multi-user.target
+        \" > /etc/systemd/system/configure-cwagent.service"
+              - name: EnableServiceOnRestart
+                action: ExecuteBash
+                inputs: 
+                  commands:
+                    - cat /etc/systemd/system/configure-cwagent.service
+                    - systemctl enable configure-cwagent
+
+  ImageBuilderBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      BucketName: !Sub "${ProjectName}-${environment}-image-builder"
+      Tags:
+        - Key: env 
+          Value: build
+  
+  # Infrastructure Resources
+  ALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security Group for Application Load Balancer to expose HTTP 80
+      GroupName: !Sub "${environment}-pub-01-alb"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name 
+          Value: !Sub "${ProjectName}-${environment}-alb-sg"
+      VpcId: !Ref VPC
+
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${ProjectName}-${environment}-alb"
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref ALBSG
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Type: application
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTG
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+
+  ALBTG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200'
+      Name: !Sub "${ProjectName}-${environment}-asg-tg"
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name 
+          Value: !Sub "${ProjectName}-${environment}-asg-tg"
+
+  Ec2InstanceLaunchTemplateSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security Group for Launchtemplate
+      GroupName: !Sub "${environment}-pub-01-instances"
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref ALBSG
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - SourceSecurityGroupId: !Ref ALBSG
+          FromPort: 443
+          IpProtocol: tcp
+          ToPort: 443
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 13.239.158.0/29
+      Tags:
+        - Key: Name 
+          Value: !Sub "${environment}-pub-01-instances"
+        - Key: env 
+          Value: !Sub "${environment}"
+      VpcId: !Ref VPC
+
+  Ec2InstanceLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${ProjectName}-${environment}-asg-instance-launch-template"
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Arn: !GetAtt
+            - MyIamInstanceProfile
+            - Arn
+        DisableApiTermination: false
+        EbsOptimized: false
+        Monitoring: 
+          Enabled: true
+        SecurityGroupIds:
+          - !Ref Ec2InstanceLaunchTemplateSG
+        TagSpecifications:
+        - ResourceType: instance
+          Tags:
+          - Key: env
+            Value: !Sub "${environment}"
+          - Key: autoscale
+            Value: true
+          - Key: Name
+            Value: !Sub "${ProjectName}-ec2-${environment}-appsrv-asginstance"
+        - ResourceType: volume
+          Tags:
+          - Key: env
+            Value: !Sub "${environment}"
+          - Key: autoscale
+            Value: true
+        ImageId: !Ref ImageId
+        InstanceType: !Ref InstanceType
+
+  Ec2InstanceAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub "${ProjectName}-${environment}-asg"
+      VPCZoneIdentifier:
+      - !Ref PublicSubnet1
+      - !Ref PublicSubnet2
+      TargetGroupARNs:
+      - !Ref ALBTG
+      LaunchTemplate:
+        LaunchTemplateId: !Ref Ec2InstanceLaunchTemplate
+        Version: !GetAtt Ec2InstanceLaunchTemplate.LatestVersionNumber
+      MinSize: !Ref Ec2AutoscaleMinSize
+      MaxSize: !Ref Ec2AutoscaleMaxSize
+      DesiredCapacity: !Ref Ec2AutoscaleDesiredCapacity
+      Tags:
+          - Key: autoscaling
+            Value: true
+            PropagateAtLaunch: true
+          - Key: env
+            Value: !Sub "${environment}"
+            PropagateAtLaunch: true
+
+  ASGCPUPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref Ec2InstanceAutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 70
+
+  ScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref Ec2InstanceAutoScalingGroup
+      Cooldown: '1'
+      ScalingAdjustment: 1
+
+  ScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref Ec2InstanceAutoScalingGroup
+      Cooldown: '300'
+      ScalingAdjustment: -1
+
+  MemoryAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      EvaluationPeriods: 1
+      Statistic: Average
+      Threshold: 70
+      AlarmDescription: Go in Alarm is memory is higher than 70% for 60 seconds
+      Period: 60
+      AlarmActions:
+      - Ref: ScaleUpPolicy
+      Namespace: CWAgent
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref Ec2InstanceAutoScalingGroup
+      ComparisonOperator: GreaterThanThreshold
+      MetricName: mem_used_percent
+
+  MemoryAlarmLow:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      EvaluationPeriods: 1
+      Statistic: Average
+      Threshold: 30
+      AlarmDescription: Go in Alarm is memory is lower than 30% for 60 seconds
+      Period: 60
+      AlarmActions:
+      - Ref: ScaleDownPolicy
+      Namespace: CWAgent
+      Dimensions:
+      - Name: AutoScalingGroupName
+        Value: !Ref Ec2InstanceAutoScalingGroup
+      ComparisonOperator: LessThanOrEqualToThreshold
+      MetricName: mem_used_percent
+
+  MyIamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${ProjectName}-${environment}-web-instance-role-instance-profile"
+      Path: "/"
+      Roles:
+        - !Ref WebInstanceRole
+
+  WebInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${environment}-web-instance-role"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: S3AccessPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - s3:Get*
+                  - s3:List*
+                Resource: 
+                  - "*"
+                  - arn:aws:s3:::aws-codedeploy-ap-southeast-2/*
+                  - arn:aws:s3:::aws-codedeploy-us-east-2/*
+                  - arn:aws:s3:::aws-codedeploy-us-east-1/*
+                  - arn:aws:s3:::aws-codedeploy-us-west-1/*
+                  - arn:aws:s3:::aws-codedeploy-us-west-2/*
+                  - arn:aws:s3:::aws-codedeploy-ca-central-1/*
+                  - arn:aws:s3:::aws-codedeploy-eu-west-1/*
+                  - arn:aws:s3:::aws-codedeploy-eu-west-2/*
+                  - arn:aws:s3:::aws-codedeploy-eu-west-3/*
+                  - arn:aws:s3:::aws-codedeploy-eu-central-1/*
+                  - arn:aws:s3:::aws-codedeploy-ap-east-1/*
+                  - arn:aws:s3:::aws-codedeploy-ap-northeast-1/*
+                  - arn:aws:s3:::aws-codedeploy-ap-northeast-2/*
+                  - arn:aws:s3:::aws-codedeploy-ap-southeast-1/*
+                  - arn:aws:s3:::aws-codedeploy-ap-south-1/*
+                  - arn:aws:s3:::aws-codedeploy-sa-east-1/*
+        - PolicyName: AssetsS3AccessPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - s3:Get*
+                  - s3:List*
+                  - s3:Put*
+                Resource: "*"
+                # !GetAtt ProjBucket.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeployLimited
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+  ProjBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      BucketName: !Sub "${ProjectName}-${environment}"
+      Tags:
+        - Key: env 
+          Value: !Sub "${environment}"
+
+  AmazonCloudWatchParameter:
+    Type: AWS::SSM::Parameter
+    Properties: 
+      DataType: text
+      Description: "Cloudwatch Configuration for all ASG instances"
+      Name: !Sub "AmazonCloudWatch-asginstance-configuration-ssm-${environment}"
+      Tier: Standard
+      Type: String
+      Value: !Sub |
+        {
+        	"agent": {
+        		"metrics_collection_interval": 60,
+        		"run_as_user": "root"
+        	},
+        	"logs": {
+        		"logs_collected": {
+        			"files": {
+        				"collect_list": [{
+        						"file_path": "/var/log/nginx/api${environment}/access.log",
+        						"log_group_name": "api${environment}/access.log",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/log/nginx/api${environment}/error.log",
+        						"log_group_name": "api${environment}/error.log",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/www/api/storage/logs/*.log",
+        						"log_group_name": "api${environment}/logs",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/log/nginx/cms${environment}/access.log",
+        						"log_group_name": "cms${environment}/access.log",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/log/nginx/cms${environment}/error.log",
+        						"log_group_name": "cms${environment}/error.log",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/log/nginx/web${environment}/access.log",
+        						"log_group_name": "web${environment}/access.log",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/log/nginx/web${environment}/error.log",
+        						"log_group_name": "web${environment}/error.log",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/log/nginx/access.log",
+        						"log_group_name": "nginx/access.log",
+        						"log_stream_name": "{instance_id}"
+        					},
+        					{
+        						"file_path": "/var/log/nginx/error.log",
+        						"log_group_name": "nginx/error.log",
+        						"log_stream_name": "{instance_id}"
+        					}
+        				]
+        			}
+        		}
+        	},
+        	"metrics": {
+        		"append_dimensions": {
+        			"AutoScalingGroupName": "${!aws:AutoScalingGroupName}",
+        			"ImageId": "${!aws:ImageId}",
+        			"InstanceId": "${!aws:InstanceId}",
+        			"InstanceType": "${!aws:InstanceType}"
+        		},
+        		"aggregation_dimensions": [["InstanceId"],
+        			["AutoScalingGroupName"],
+        			["AutoScalingGroupName", "InstanceType"]
+        		],
+        		"metrics_collected": {
+        			"disk": {
+        				"measurement": [
+        					"used_percent"
+        				],
+        				"metrics_collection_interval": 60,
+        				"resources": [
+        					"*"
+        				]
+        			},
+        			"mem": {
+        				"measurement": [
+        					"mem_used_percent"
+        				],
+        				"metrics_collection_interval": 60
+        			},
+        			"statsd": {
+        				"metrics_aggregation_interval": 60,
+        				"metrics_collection_interval": 10,
+        				"service_address": ":8125"
+        			}
+        		}
+        	}
+        }
+
+  # Security features
+  VpcFlowRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: 'vpc-flow-logs.amazonaws.com'
+          Action: 'sts:AssumeRole'
+      Policies:
+      - PolicyName: 'flowlogs-policy'
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - 'logs:CreateLogStream'
+            - 'logs:PutLogEvents'
+            - 'logs:DescribeLogGroups'
+            - 'logs:DescribeLogStreams'
+            Resource: !GetAtt 'VpcLogGroup.Arn'
+
+  VpcLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      RetentionInDays: 60
+
+  FlowLog:
+    Type: 'AWS::EC2::FlowLog'
+    Properties:
+      DeliverLogsPermissionArn: !GetAtt 'VpcFlowRole.Arn'
+      LogGroupName: !Ref VpcLogGroup
+      ResourceId: !Ref VPC
+      ResourceType: 'VPC'
+      TrafficType: ALL
+      Tags:
+      - Key: Name
+        Value: !Sub "${ProjectName}-vpcflowlog-${environment}" 
+
+  # CICD Resources
+  ApiCodeBuild:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Name: !Sub "${ProjectName}-${environment}-api-build"
+      Tags:
+        - Key: env
+          Value: build
+      Source:
+        Type: NO_SOURCE
+        GitCloneDepth: 1
+        BuildSpec: |
+          version: 0.2
+          
+          phases:
+            install:
+              runtime-versions:
+                php: 8.2
+                nodejs: 18
+              finally:
+                - echo 'Build complete'
+            build:
+              commands:
+                - git clone --single-branch --depth 1 --branch $REPOSITORY_BRANCH $REPOSITORY_URL repo 
+                - cd repo
+                - composer install --ignore-platform-reqs --prefer-dist --optimize-autoloader --no-dev
+              finally:
+                - echo 'Build complete'
+          artifacts:
+            name: $(date -u +'%Y-%m-%d-%H-%M-%S')-bundle.zip
+            type: zip
+            base-directory: repo
+            files:
+              - '**/*'
+            exclude-paths:
+              - '.git'
+              - '.gitignore'
+              - '**/.git'
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: REPOSITORY_URL
+            Value: !Ref ApiRepositoryUrl
+          - Name: REPOSITORY_BRANCH
+            Value: !Ref SourceBranch
+      TimeoutInMinutes: 5
+      QueuedTimeoutInMinutes: 60
+      ServiceRole: !Ref CodeBuildRole
+      Artifacts:
+        Type: S3
+        Location: !Ref DeploymentsBucket
+        OverrideArtifactName: true 
+        Path: api
+        Packaging: ZIP
+      LogsConfig:
+        CloudWatchLogs: 
+          Status: ENABLED
+
+  DeploymentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      BucketName: !Sub "${ProjectName}-${environment}-deployments"
+      Tags:
+        - Key: env 
+          Value: build
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${environment}-codebuild-service-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: codebuild.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CanAccessS3DeploymentsBucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !GetAtt DeploymentsBucket.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  ApiApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: !Sub "${ProjectName}-api-${environment}"
+      ComputePlatform: Server
+
+  ApiDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      DeploymentGroupName: !Sub "${ProjectName}-${environment}-asg"
+      ApplicationName: !Ref ApiApplication
+      AutoScalingGroups:
+        - Ref: Ec2InstanceAutoScalingGroup
+      ServiceRoleArn:
+        Fn::GetAtt:
+        - CodeDeployIAMRole
+        - Arn
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      AutoRollbackConfiguration:
+        Enabled: false
+
+  CodeDeployIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${environment}-codedeploy-service-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: CodeDeployTrustPolicy
+          Effect: Allow
+          Principal:
+            Service:
+            - codedeploy.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeDeployLaunchASGInstances
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - iam:PassRole
+                  - ec2:CreateTags
+                  - ec2:RunInstances
+                Resource: "*"
+      Path: "/"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+
+  ApiCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${ProjectName}-api-${environment}"
+      RoleArn: !GetAtt [CodePipelineRole, Arn]
+      ArtifactStore:
+        Location:
+          Ref:
+            DeploymentsBucket
+        Type: S3
+      Stages:
+        - Name: Source
+          Actions:
+            - InputArtifacts: []
+              Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Namespace: SourceVariables
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                S3Bucket:
+                  Ref: DeploymentsBucket
+                S3ObjectKey: 
+                  Ref: S3ObjectKeyZip
+              RunOrder: 1
+        - Name: Build
+          Actions:
+          - Name: Build
+            ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+            Namespace: BuildVariables
+            OutputArtifacts:
+              - Name: BuildArtifact
+            InputArtifacts:
+              - Name: SourceArtifact
+            Configuration:
+                ProjectName: !Ref ApiCodeBuild
+            RunOrder: 1
+        - Name: Deploy
+          Actions:
+          - Name: Deploy
+            ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeploy
+            Namespace: DeployVariables
+            InputArtifacts:
+              - Name: BuildArtifact
+            Configuration:
+                ApplicationName: !Ref ApiApplication
+                DeploymentGroupName: !Ref ApiDeploymentGroup
+            RunOrder: 1
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${environment}-codepipeline-service-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: codepipeline.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  CmsCodeBuild:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Name: !Sub "${ProjectName}-${environment}-cms-build"
+      Tags:
+        - Key: env
+          Value: build
+      Source:
+        Type: NO_SOURCE
+        GitCloneDepth: 1
+        BuildSpec: |
+          version: 0.2
+
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 18
+              finally:
+                - echo 'Build complete'
+            build:
+              commands:
+                - git clone --single-branch --depth 1 --branch $REPOSITORY_BRANCH $REPOSITORY_URL repo
+                - cd repo
+                - npm install
+                - npm run generate
+              finally:
+                - echo 'Build complete'
+          artifacts:
+            name: $(date -u +'%Y-%m-%d-%H-%M-%S')-bundle.zip
+            type: zip
+            base-directory: repo
+            files:
+              - 'codedeploy/**/*'
+              - 'dist/**/*'
+              - 'appspec.yml'
+            exclude-paths:
+              - '.git'
+              - '.gitignore'
+              - '**/.git'
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: REPOSITORY_URL
+            Value: !Ref CmsRepositoryUrl
+          - Name: REPOSITORY_BRANCH
+            Value: !Ref SourceBranch
+          - Name: BASE_URL
+            Value: !Ref BaseUrl
+          - Name: VUE_APP_API_URL
+            Value: !Ref VueAppApiUrl
+      TimeoutInMinutes: 300
+      QueuedTimeoutInMinutes: 60
+      ServiceRole: !Ref CodeBuildRole
+      Artifacts:
+        Type: S3
+        Location: !Ref DeploymentsBucket
+        OverrideArtifactName: true 
+        Path: cms
+        Packaging: ZIP
+      LogsConfig:
+        CloudWatchLogs: 
+          Status: ENABLED
+
+  CmsApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: !Sub "${ProjectName}-cms-${environment}"
+      ComputePlatform: Server
+
+  CmsDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      DeploymentGroupName: !Sub "${ProjectName}-${environment}-asg"
+      ApplicationName: !Ref CmsApplication
+      AutoScalingGroups:
+        - Ref: Ec2InstanceAutoScalingGroup
+      ServiceRoleArn:
+        Fn::GetAtt:
+        - CodeDeployIAMRole
+        - Arn
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      AutoRollbackConfiguration:
+        Enabled: false
+
+  CmsCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${ProjectName}-cms-${environment}"
+      RoleArn: !GetAtt [CodePipelineRole, Arn]
+      ArtifactStore:
+        Location:
+          Ref:
+            DeploymentsBucket
+        Type: S3
+      Stages:
+        - Name: Source
+          Actions:
+            - InputArtifacts: []
+              Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Namespace: SourceVariables
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                S3Bucket:
+                  Ref: DeploymentsBucket
+                S3ObjectKey: 
+                  Ref: S3ObjectKeyZip
+              RunOrder: 1
+        - Name: Build
+          Actions:
+          - Name: Build
+            ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+            Namespace: BuildVariables
+            OutputArtifacts:
+              - Name: BuildArtifact
+            InputArtifacts:
+              - Name: SourceArtifact
+            Configuration:
+                ProjectName: !Ref CmsCodeBuild
+            RunOrder: 1
+        - Name: Deploy
+          Actions:
+          - Name: Deploy
+            ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeploy
+            Namespace: DeployVariables
+            InputArtifacts:
+              - Name: BuildArtifact
+            Configuration:
+                ApplicationName: !Ref CmsApplication
+                DeploymentGroupName: !Ref CmsDeploymentGroup
+            RunOrder: 1
+
+# WebPipeline
+  WebCodeBuild:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Name: !Sub "${ProjectName}-${environment}-web-build"
+      Tags:
+        - Key: env
+          Value: build
+      Source:
+        Type: NO_SOURCE
+        GitCloneDepth: 1
+        BuildSpec: |
+          version: 0.2
+
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 14
+              finally:
+                - echo 'Build complete'
+            build:
+              commands:
+                - git clone --single-branch --depth 1 --branch $REPOSITORY_BRANCH $REPOSITORY_URL repo
+                - cd repo
+                - npm install
+                - npm run generate
+              finally:
+                - echo 'Build complete'
+          artifacts:
+            name: $(date -u +'%Y-%m-%d-%H-%M-%S')-bundle.zip
+            type: zip
+            base-directory: repo
+            files:
+              - '**/*'
+            exclude-paths:
+              - '.git'
+              - '.gitignore'
+              - '**/.git'
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: REPOSITORY_URL
+            Value: !Ref WebRepositoryUrl
+          - Name: REPOSITORY_BRANCH
+            Value: develop
+      TimeoutInMinutes: 300
+      QueuedTimeoutInMinutes: 60
+      ServiceRole: !Ref CodeBuildRole
+      Artifacts:
+        Type: S3
+        Location: !Ref DeploymentsBucket
+        OverrideArtifactName: true 
+        Path: web
+        Packaging: ZIP
+      LogsConfig:
+        CloudWatchLogs: 
+          Status: ENABLED
+
+  WebApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties: 
+      ApplicationName: !Sub "${ProjectName}-web-${environment}"
+      ComputePlatform: Server
+
+  WebDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      DeploymentGroupName: !Sub "${ProjectName}-${environment}-asg"
+      ApplicationName: !Ref WebApplication
+      AutoScalingGroups:
+        - Ref: Ec2InstanceAutoScalingGroup
+      ServiceRoleArn:
+        Fn::GetAtt:
+        - CodeDeployIAMRole
+        - Arn
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+      AutoRollbackConfiguration:
+        Enabled: false
+
+  WebCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${ProjectName}-web-${environment}"
+      RoleArn: !GetAtt [CodePipelineRole, Arn]
+      ArtifactStore:
+        Location:
+          Ref:
+            DeploymentsBucket
+        Type: S3
+      Stages:
+        - Name: Source
+          Actions:
+            - InputArtifacts: []
+              Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Namespace: SourceVariables
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                S3Bucket:
+                  Ref: DeploymentsBucket
+                S3ObjectKey: 
+                  Ref: S3ObjectKeyZip
+              RunOrder: 1
+        - Name: Build
+          Actions:
+          - Name: Build
+            ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+            Namespace: BuildVariables
+            OutputArtifacts:
+              - Name: BuildArtifact
+            InputArtifacts:
+              - Name: SourceArtifact
+            Configuration:
+                ProjectName: !Ref WebCodeBuild
+            RunOrder: 1
+        - Name: Deploy
+          Actions:
+          - Name: Deploy
+            ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeploy
+            Namespace: DeployVariables
+            InputArtifacts:
+              - Name: BuildArtifact
+            Configuration:
+                ApplicationName: !Ref WebApplication
+                DeploymentGroupName: !Ref WebDeploymentGroup
+            RunOrder: 1
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Database instances security group
+      GroupName: !Sub "${environment}-priv-01-sql"
+      VpcId: !Ref VPC
+      SecurityGroupIngress: 
+        - SourceSecurityGroupId: !Ref Ec2InstanceLaunchTemplateSG
+          FromPort: 3306
+          IpProtocol: tcp
+          ToPort: 3306
+      SecurityGroupEgress: 
+        - 
+          CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+      Tags:
+        - Key: Name 
+          Value: !Sub "${ProjectName}-${environment}-priv-01-sql"
+
+  RDSDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet Group for mySQL database
+      DBSubnetGroupName: !Sub "${AWS::Region}-${environment}-aws-dxl-database-subnet-group"
+      SubnetIds: 
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  # KMS RDS encryption key
+  RDSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-rds
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action: 'kms:*'
+            Resource: '*'
+
+  RDSDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${ProjectName}-${environment}"
+      DBName: !Sub "${ProjectName}_${environment}"
+      AllocatedStorage: 20
+      DBInstanceClass: !Ref RDSInstance
+      Engine: "MYSQL"
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Sub "${ProjectName}^Random"
+      BackupRetentionPeriod: 7
+      MultiAZ: false
+      EngineVersion: 8.0.35
+      AutoMinorVersionUpgrade: true
+      PubliclyAccessible: false
+      StorageType: gp2
+      Port: 3306
+      CopyTagsToSnapshot: true
+      EnableIAMDatabaseAuthentication: false
+      EnablePerformanceInsights: false
+      DeletionProtection: false
+      DBSubnetGroupName: !Ref RDSDBSubnetGroup
+      VPCSecurityGroups: 
+        - !Ref RDSSecurityGroup
+      MaxAllocatedStorage: 1000
+      DBParameterGroupName: !Ref ParameterGroup
+      StorageEncrypted: true
+      KmsKeyId: !Ref RDSKey
+      CACertificateIdentifier: rds-ca-ecc384-g1
+
+Outputs:
+
+  Name:
+    Description: VPC Stack Name
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub ${AWS::StackName}-Name
+
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcID"
+
+  PublicSubnet1:
+    Description: Public subnet 1 ID
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1ID"
+
+  PublicSubnet2:
+    Description: Public subnet 2 ID
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet2ID"
+
+  PrivateSubnet1:
+    Description: Private subnet 1 ID
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1ID"
+
+  PrivateSubnet2:
+    Description: Private subnet 2 ID
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet2ID"
+
+  Ec2InstanceLaunchTemplate:
+    Description: Ec2 Launch Template
+    Value: !Ref Ec2InstanceLaunchTemplate
+    Export:
+      Name: !Sub "${AWS::StackName}-Ec2InstanceLaunchTemplate"
+
+  Ec2InstanceAutoScalingGroup:
+    Description: Ec2 Auto Scaling Group
+    Value: !Ref Ec2InstanceAutoScalingGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-Ec2InstanceAutoScalingGroup"
+
+  ProjBucket:
+    Description: S3 Bucket Assets
+    Value: !Ref ProjBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-ProjBucket"
