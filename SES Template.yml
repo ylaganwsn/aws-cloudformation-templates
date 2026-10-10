@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "SES Template with Lambda function trigger CloudWatch"
+
+Parameters:
+  ParentStack:
+    Description: Active CloudFormation stack containing VPC resources
+    Type: String
+    Default: Development
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+
+  ProjectName:
+    Type: String
+    Default: "ProjectName"
+
+  environment:
+    Description: Environment type of the project
+    Type: String
+    Default: "dev"
+    AllowedValues: 
+      - dev
+      - staging
+      - prod
+
+  ExternalEmailIdentity:
+    Type: String
+    Default: Enter Your Email Address
+    Description: Enter Your Email Address.
+
+  ExternalDomainIdentity:
+    Type: String
+    Default: Enter Your DNS
+    Description: Enter Your DNS.
+
+  CloudWatchGroupName:
+    Description: Cloudwatch Group Name for SES outbound mails notifications.
+    Default: /aws/ses/outbound-mail-logs
+    Type: String
+    AllowedPattern: .+
+    ConstraintDescription: Cloudwatch Group Name for SES outbound mails notifications.
+
+Resources:
+
+  SesDomainIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref 'ExternalDomainIdentity'
+
+  SesEmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref 'ExternalEmailIdentity'
+
+  SnsSesTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${ProjectName}-${environment}-SES"
+      TopicName: !Sub "${ProjectName}-${environment}-SES"
+
+  SnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: lambda
+      Endpoint: !GetAtt LambdaFunction.Arn
+      TopicArn: !Ref SnsSesTopic
+
+# Lambda Resources
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        {
+          Version: "2012-10-17",
+          Statement:
+            [
+              {
+                Effect: Allow,
+                Principal: { Service: [lambda.amazonaws.com] },
+                Action: ["sts:AssumeRole"],
+              },
+            ],
+        }
+      Policies:
+        - PolicyName: cloudwatch_write_policy
+          PolicyDocument:
+            {
+              Version: "2012-10-17",
+              Statement:
+                [
+                  {
+                    Effect: Allow,
+                    Action:
+                      [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents",
+                        "logs:DescribeLogStreams",
+                      ],
+                    Resource: ["arn:aws:logs:*:*:log-group:/aws/ses/*"],
+                  },
+                ],
+            }
+      Path: /
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SnsSesTopic
+      FunctionName: !Ref LambdaFunction
+
+  LambdaFunction:
+    Type: "AWS::Lambda::Function"
+    DependsOn: LambdaRole
+    Properties:
+      Environment: { Variables: { GROUP_NAME: !Ref CloudWatchGroupName } }
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 60
+      Handler: index.handler
+      Runtime: nodejs18.x
+      MemorySize: 128
+      Code:
+        ZipFile: |
+          const crypto = require('crypto')
+          const { CloudWatchLogs } = require('@aws-sdk/client-cloudwatch-logs')
+
+          exports.handler = async function (event) {
+            const groupName = process.env.GROUP_NAME
+            const streamName = "SES/Logs/Stream/" + crypto.randomUUID()
+            const client = new CloudWatchLogs()
+
+            // Try to create Log Group if not exist
+            try {
+              await client.createLogGroup({ logGroupName: groupName })
+            } catch (error) {
+              console.log("Log group: ", groupName, error)
+            }
+
+            // Try to create Log Stream if not exist
+            try {
+              await client.createLogStream({ logGroupName: groupName, logStreamName: streamName })
+            } catch (error) {
+              console.log("Log stream: ", streamName, error)
+            }
+
+
+            const streams = await client
+              .describeLogStreams({ limit: 1, logGroupName: groupName, logStreamName: streamName })
+
+            const logStreams = streams.logStreams
+            const sequenceToken = logStreams[0].uploadSequenceToken
+
+            const promises = []
+            event.Records.forEach(record => {
+              const params = {
+                logGroupName: groupName,
+                logStreamName: streamName,
+                sequenceToken,
+                logEvents: [{
+                  timestamp: new Date().getTime(),
+                  message: record.Sns.Message,
+                }]
+              }
+              promises.push(client.putLogEvents(params))x
+            })
+
+            return await Promise.all(promises)
+          };

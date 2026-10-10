@@ -1,0 +1,105 @@
+Parameters:
+  ParentStack:
+    Description: Active CloudFormation stack containing VPC resources
+    Type: String
+    Default: Development
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+
+  ProjectName:
+    Type: String
+    Default: "ProjectName"
+
+  environment:
+    Description: Environment type of the project
+    Type: String
+    Default: "dev"
+    AllowedValues: 
+      - dev
+      - staging
+      - prod
+
+  EmailAdd1:
+    Type: String
+    Default: Enter Your Email Address
+    Description: Enter Your Email Address.
+
+  EmailAdd2:
+    Type: String
+    Default: Enter Your 2nd Email Address
+    Description: Enter Your 2nd Email Address.
+
+  HttpsEndpnt:
+    Type: String
+    Default: Enter Your Sonic endpoint
+    Description: Enter Your Sonic endpoint.
+
+Resources:
+  SnsAlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${ProjectName}-${environment}-Alarms"
+      TopicName: !Sub "${ProjectName}-${environment}-Alarms"
+      Subscription:
+        - Endpoint: !Ref EmailAdd1
+          Protocol: email
+        - Endpoint: !Ref EmailAdd2
+          Protocol: email
+        - Endpoint: !Ref HttpsEndpnt
+          Protocol: https
+
+  # Alarms
+  CpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: !Sub "${ProjectName}-${environment} Server CPU Usage High"
+      AlarmActions:
+        - !Ref SnsAlarmTopic
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value:
+            Fn::ImportValue: !Sub ${ParentStack}-Ec2InstanceAutoScalingGroup
+
+  DiskAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: !Sub "${ProjectName}-${environment} Server Disk Usage High"
+      AlarmActions:
+        - !Ref SnsAlarmTopic
+      MetricName: disk_used_percent
+      Namespace: CWAgent
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value:
+            Fn::ImportValue: !Sub ${ParentStack}-Ec2InstanceAutoScalingGroup
+
+  MemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: !Sub "${ProjectName}-${environment} Server Memory Usage"
+      AlarmActions:
+        - !Ref SnsAlarmTopic
+      MetricName: mem_used_percent
+      Namespace: CWAgent
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value:
+            Fn::ImportValue: !Sub ${ParentStack}-Ec2InstanceAutoScalingGroup

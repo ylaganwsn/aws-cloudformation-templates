@@ -1,0 +1,73 @@
+Parameters:
+
+  ParentStack:
+    Description: Active CloudFormation stack containing VPC resources
+    Type: String
+    Default: Development
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+
+  ProjectName:
+    Type: String
+    Default: "ProjectName"
+
+  environment:
+    Description: Environment type of the project
+    Type: String
+    Default: "dev"
+    AllowedValues: 
+      - dev
+      - staging
+      - prod
+
+Resources:
+
+  ElasticacheSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Redis Elasticache Security Group
+      VpcId:
+        Fn::ImportValue: !Sub ${ParentStack}-VpcID
+      GroupName: !Sub "${environment}-priv-01-redis"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: 0.0.0.0/0
+# SourceSecurityGroupName: !Ref InstanceSecurityGroup
+
+  RedisSubnetGroup:
+    Type: 'AWS::ElastiCache::SubnetGroup'
+    Properties:
+      CacheSubnetGroupName: !Sub "${ProjectName}-${environment}-RedisSubnetGroup"
+      Description: Cache Subnet Group
+      SubnetIds:
+        - Fn::ImportValue: !Sub ${ParentStack}-PrivateSubnet1ID
+        - Fn::ImportValue: !Sub ${ParentStack}-PrivateSubnet2ID
+
+  RedisReplicationGroup:
+    Type: 'AWS::ElastiCache::ReplicationGroup'
+    Properties:
+      ReplicationGroupId: !Sub "${ProjectName}-${environment}-redis"
+      Engine: Redis
+      EngineVersion: 6.0
+      ReplicationGroupDescription: !Sub "${ProjectName}-${environment}-redis"
+      CacheParameterGroupName: default.redis6.x
+      CacheNodeType: cache.t3.micro
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      Port: 6379
+      AutomaticFailoverEnabled: false
+      MultiAZEnabled: false
+      AtRestEncryptionEnabled: Yes
+      TransitEncryptionEnabled: Yes
+      AuthToken: !Sub "${ProjectName}^Appetiser2023"
+      NumCacheClusters: 1
+
+      SecurityGroupIds:
+        - !GetAtt 
+          - ElasticacheSecurityGroup
+          - GroupId
+      Tags: 
+        - Key: "Name"
+          Value: !Sub "${environment}"
